@@ -26,6 +26,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ynr.gcal.ui.capture.CaptureSheet
 import com.ynr.gcal.ui.capture.CaptureViewModel
 import com.ynr.gcal.ui.capture.CameraScreen
+import com.ynr.gcal.ui.capture.MealResultScreen
 import androidx.compose.ui.platform.LocalContext
 
 sealed class Screen(val route: String, val icon: ImageVector? = null, val label: String? = null) {
@@ -34,6 +35,7 @@ sealed class Screen(val route: String, val icon: ImageVector? = null, val label:
     object Logs : Screen("logs", Icons.Default.List, "Logs")
     object Settings : Screen("settings", Icons.Default.Settings, "Settings")
     object Camera : Screen("camera")
+    object MealResult : Screen("meal_result")
 }
 
 @Composable
@@ -155,6 +157,17 @@ fun GCalNavHost(
                     onClose = { navController.popBackStack() }
                 )
             }
+            composable(Screen.MealResult.route) {
+                MealResultScreen(
+                    viewModel = captureViewModel,
+                    onSaveComplete = {
+                        // Clear result?
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.Home.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
         }
         
         if (showCaptureSheet) {
@@ -164,6 +177,10 @@ fun GCalNavHost(
                 onCameraClick = {
                     showCaptureSheet = false
                     navController.navigate(Screen.Camera.route)
+                },
+                onAnalysisSuccess = {
+                    showCaptureSheet = false
+                    navController.navigate(Screen.MealResult.route)
                 }
             )
         }

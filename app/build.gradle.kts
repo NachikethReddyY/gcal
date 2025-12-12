@@ -8,6 +8,7 @@ plugins {
 android {
     namespace = "com.ynr.gcal"
     compileSdk = 34
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.ynr.gcal"

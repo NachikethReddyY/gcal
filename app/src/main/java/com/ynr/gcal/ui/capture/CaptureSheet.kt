@@ -19,6 +19,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.outlined.AccountBox
@@ -28,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -43,7 +45,8 @@ import java.nio.ByteBuffer
 fun CaptureSheet(
     viewModel: CaptureViewModel,
     onDismiss: () -> Unit,
-    onCameraClick: () -> Unit
+    onCameraClick: () -> Unit,
+    onAnalysisSuccess: () -> Unit
 ) {
     var mode by remember { mutableStateOf<CaptureMode>(CaptureMode.Selection) }
     val context = LocalContext.current
@@ -74,15 +77,18 @@ fun CaptureSheet(
         }
     }
 
+    LaunchedEffect(viewModel.analysisResult) {
+        if (viewModel.analysisResult != null) {
+            onAnalysisSuccess()
+        }
+    }
+
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier.padding(16.dp).fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             when {
-                viewModel.analysisResult != null -> {
-                    ResultView(viewModel, onDismiss)
-                }
                 viewModel.isAnalyzing -> {
                     CircularProgressIndicator(color = DeepBlue)
                     Spacer(modifier = Modifier.height(16.dp))
@@ -99,8 +105,10 @@ fun CaptureSheet(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
+//...
+
                         CaptureOption(
-                            icon = R.drawable.ic_app_icon, // Fallback
+                            icon = Icons.Filled.Add,
                             label = "Camera",
                             onClick = {
                                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
@@ -113,7 +121,7 @@ fun CaptureSheet(
                         // Gallery button removed as per request (moved to Camera Screen)
                         
                         CaptureOption(
-                            icon = R.drawable.ic_app_icon, // Fallback
+                            icon = Icons.Default.Create,
                             label = "Text",
                             onClick = { mode = CaptureMode.Text }
                         )
@@ -174,38 +182,11 @@ fun ImageConfirmView(viewModel: CaptureViewModel) {
     }
 }
 
-@Composable
-fun ResultView(viewModel: CaptureViewModel, onDismiss: () -> Unit) {
-    val result = viewModel.analysisResult!!
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("Result", style = MaterialTheme.typography.headlineSmall)
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(result.foodName, style = MaterialTheme.typography.titleLarge)
-        Text("${result.calories} kcal", style = MaterialTheme.typography.displayMedium, color = DeepBlue)
-        
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            Text("${result.protein}g C")
-            Text("${result.carbs}g P")
-            Text("${result.fat}g F")
-        }
-        
-        Spacer(modifier = Modifier.height(24.dp))
-        Button(
-            onClick = { 
-                viewModel.saveMeal()
-                onDismiss() // Close sheet
-            },
-            colors = ButtonDefaults.buttonColors(containerColor = EnergeticOrange),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Save Log")
-        }
-    }
-}
+// ResultView removed (moved to MealResultScreen)
 
 @Composable
 fun CaptureOption(
-    icon: Int,
+    icon: ImageVector,
     label: String,
     onClick: () -> Unit
 ) {
@@ -217,7 +198,7 @@ fun CaptureOption(
             .padding(16.dp)
     ) {
         Icon(
-            painter = androidx.compose.ui.res.painterResource(id = icon),
+            imageVector = icon,
             contentDescription = label,
             modifier = Modifier.size(48.dp),
             tint = DeepBlue

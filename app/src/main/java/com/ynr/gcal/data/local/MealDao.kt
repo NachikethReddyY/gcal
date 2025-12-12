@@ -1,6 +1,7 @@
 package com.ynr.gcal.data.local
 
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -11,6 +12,9 @@ interface MealDao {
     // Meal Logs
     @Insert
     suspend fun insertMeal(meal: MealLog)
+    
+    @Delete
+    suspend fun deleteMeal(meal: MealLog)
 
     @Query("SELECT * FROM meal_logs WHERE timestamp >= :startTime AND timestamp <= :endTime ORDER BY timestamp DESC")
     fun getMealsBetween(startTime: Long, endTime: Long): Flow<List<MealLog>>

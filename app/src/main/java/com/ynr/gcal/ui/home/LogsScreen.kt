@@ -24,11 +24,23 @@ import com.ynr.gcal.data.local.MealLog
 import com.ynr.gcal.ui.theme.DeepBlue
 import com.ynr.gcal.ui.theme.EnergeticOrange
 import com.ynr.gcal.ui.theme.OffWhite
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
+import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlinx.coroutines.launch
 
 class LogsViewModel(private val appContainer: AppContainer) : androidx.lifecycle.ViewModel() {
     val meals = appContainer.mealDao.getAllMeals()
+    
+    fun deleteMeal(meal: MealLog) {
+        viewModelScope.launch {
+            appContainer.mealDao.deleteMeal(meal)
+        }
+    }
     
     // Factory
     @Suppress("UNCHECKED_CAST")
@@ -40,7 +52,7 @@ class LogsViewModel(private val appContainer: AppContainer) : androidx.lifecycle
 }
 
 @SuppressLint("SimpleDateFormat")
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun LogsScreen(appContainer: AppContainer) {
     val viewModel: LogsViewModel = viewModel(factory = LogsViewModel.Factory(appContainer))
@@ -92,8 +104,37 @@ fun LogsScreen(appContainer: AppContainer) {
                         )
                     }
                     
-                    items(dailyMeals) { meal ->
-                        MealCard(meal, timeFormatter)
+                    items(dailyMeals, key = { it.id }) { meal ->
+                        val dismissState = rememberDismissState(
+                            confirmValueChange = {
+                                if (it == DismissValue.DismissedToStart) {
+                                    viewModel.deleteMeal(meal)
+                                    true
+                                } else false
+                            }
+                        )
+                        
+                        SwipeToDismiss(
+                            state = dismissState,
+                            background = {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Red, RoundedCornerShape(16.dp))
+                                        .padding(horizontal = 20.dp),
+                                    contentAlignment = Alignment.CenterEnd
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete",
+                                        tint = Color.White
+                                    )
+                                }
+                            },
+                            dismissContent = {
+                                MealCard(meal, timeFormatter)
+                            }
+                        )
                     }
                 }
             }

@@ -22,6 +22,7 @@ data class HomeUiState(
     val consumedFat: Int = 0,
     val streak: Int = 0,
     val waterIntake: Int = 0,
+    val waterGoal: Int = 2500,
     val recentLogs: List<MealLog> = emptyList()
 )
 
@@ -70,16 +71,16 @@ class HomeViewModel(
     )
 
     fun changeDate(daysToAdd: Long) {
-        _selectedDate.value = _selectedDate.value.plusDays(daysToAdd)
+        val newDate = _selectedDate.value.plusDays(daysToAdd)
+        if (!newDate.isAfter(LocalDate.now())) {
+            _selectedDate.value = newDate
+        }
     }
 
     fun updateWater(amount: Int) {
         viewModelScope.launch {
             val date = _selectedDate.value
             val dateString = date.toString()
-            // We need to fetch current summary first or upsert.
-            // Since we are in VM, let's just do a quick read-modify-write transactional style or assume simple update
-            // Ideally DAO has @Transaction, but for MVP:
             val currentSummary = mealDao.getSummary(dateString).firstOrNull()
             
             val newWater = ((currentSummary?.waterIntake ?: 0) + amount).coerceAtLeast(0)
@@ -91,7 +92,7 @@ class HomeViewModel(
                 totalCarbs = 0,
                 totalFat = 0,
                 goalCalories = 0,
-                streakCount = 0, // Logic for streak calc is separate, ignoring for now
+                streakCount = 0,
                 waterIntake = newWater
             )
             mealDao.insertOrUpdateSummary(summary)

@@ -47,7 +47,7 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
         ) {
-            Text("Home of GCal", style = MaterialTheme.typography.headlineMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+            Text("GCal", style = MaterialTheme.typography.headlineMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
             
             Row(
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
@@ -70,13 +70,32 @@ fun HomeScreen(
             IconButton(onClick = { viewModel.changeDate(-1) }) {
                 Icon(Icons.Default.ArrowBack, "Previous")
             }
+            
+            val dateText = remember(selectedDate) {
+                val today = java.time.LocalDate.now()
+                when {
+                    selectedDate == today -> "Today"
+                    selectedDate == today.minusDays(1) -> "Yesterday"
+                    else -> selectedDate.format(java.time.format.DateTimeFormatter.ofPattern("EEE, d MMM"))
+                }
+            }
+            
             Text(
-                text = if (selectedDate == java.time.LocalDate.now()) "Today" else selectedDate.toString(),
+                text = dateText,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
             )
-            IconButton(onClick = { viewModel.changeDate(1) }) {
-                Icon(Icons.Default.ArrowForward, "Next")
+            
+            val isToday = selectedDate >= java.time.LocalDate.now()
+            IconButton(
+                onClick = { viewModel.changeDate(1) },
+                enabled = !isToday
+            ) {
+                Icon(
+                    Icons.Default.ArrowForward, 
+                    "Next", 
+                    tint = if (!isToday) MaterialTheme.colorScheme.onSurface else Color.LightGray.copy(alpha = 0.5f)
+                )
             }
         }
 
@@ -140,14 +159,15 @@ fun HomeScreen(
             ) {
                 Column {
                     Text("Water", style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                    Text("${state.waterIntake} cups", style = MaterialTheme.typography.headlineSmall, color = DeepBlue)
+                    Text("${state.waterIntake} / ${state.waterGoal} ml", style = MaterialTheme.typography.headlineSmall, color = DeepBlue)
                 }
                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    IconButton(onClick = { viewModel.updateWater(-1) }) {
+                    IconButton(onClick = { viewModel.updateWater(-250) }) {
                        Text("-", style = MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = DeepBlue)
                     }
+                    Spacer(modifier = Modifier.width(8.dp))
                     IconButton(
-                        onClick = { viewModel.updateWater(1) },
+                        onClick = { viewModel.updateWater(250) },
                         modifier = Modifier.background(DeepBlue, androidx.compose.foundation.shape.CircleShape)
                     ) {
                         Icon(androidx.compose.material.icons.Icons.Default.Add, "Increase", tint = Color.White)
