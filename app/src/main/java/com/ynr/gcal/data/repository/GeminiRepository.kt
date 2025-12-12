@@ -20,7 +20,7 @@ class GeminiRepository {
         apiKey: String,
         age: Int, weight: Float, gender: String, activity: String, goal: String, diet: String
     ): String = withContext(Dispatchers.IO) {
-        val model = getModel(apiKey, "gemini-1.5-flash")
+        val model = getModel(apiKey, "gemini-2.5-flash")
         val prompt = "User is $age, $weight kg, $gender, $diet, Activity Level: $activity. Goal: $goal. " +
                 "Calculate precise Daily Calorie, Protein, Carb, and Fat targets. " +
                 "Return strictly JSON with keys: 'calories', 'protein', 'carbs', 'fat'. No markdown."
@@ -30,7 +30,7 @@ class GeminiRepository {
     }
 
     suspend fun analyzeFoodText(apiKey: String, text: String): String = withContext(Dispatchers.IO) {
-        val model = getModel(apiKey, "gemini-1.5-flash")
+        val model = getModel(apiKey, "gemini-2.5-flash")
         val prompt = "Estimate nutritional values for standard portion size of: \"$text\". " +
                 "Return strictly JSON with keys: 'foodName', 'calories', 'protein', 'carbs', 'fat'. No markdown."
         
@@ -39,7 +39,7 @@ class GeminiRepository {
     }
 
     suspend fun analyzeFoodImage(apiKey: String, bitmap: Bitmap, hint: String): String = withContext(Dispatchers.IO) {
-        val model = getModel(apiKey, "gemini-1.5-flash")
+        val model = getModel(apiKey, "gemini-2.5-flash")
         
         val inputContent = content {
             image(bitmap)
