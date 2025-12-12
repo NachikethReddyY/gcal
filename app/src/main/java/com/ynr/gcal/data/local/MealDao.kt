@@ -12,6 +12,9 @@ interface MealDao {
     @Insert
     suspend fun insertMeal(meal: MealLog)
 
+    @Query("SELECT * FROM meal_logs WHERE timestamp >= :startTime AND timestamp <= :endTime ORDER BY timestamp DESC")
+    fun getMealsBetween(startTime: Long, endTime: Long): Flow<List<MealLog>>
+
     @Query("SELECT * FROM meal_logs WHERE date(timestamp / 1000, 'unixepoch') = date(:timestamp / 1000, 'unixepoch') ORDER BY timestamp DESC")
     fun getMealsForDay(timestamp: Long): Flow<List<MealLog>>
 

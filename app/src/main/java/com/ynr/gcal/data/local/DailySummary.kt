@@ -11,5 +11,6 @@ data class DailySummary(
     val totalCarbs: Int,
     val totalFat: Int,
     val goalCalories: Int,
-    val streakCount: Int
+    val streakCount: Int,
+    val waterIntake: Int = 0
 )

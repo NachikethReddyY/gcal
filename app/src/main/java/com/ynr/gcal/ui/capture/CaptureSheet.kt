@@ -15,6 +15,7 @@ import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -41,7 +42,8 @@ import java.nio.ByteBuffer
 @Composable
 fun CaptureSheet(
     viewModel: CaptureViewModel,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onCameraClick: () -> Unit
 ) {
     var mode by remember { mutableStateOf<CaptureMode>(CaptureMode.Selection) }
     val context = LocalContext.current
@@ -51,10 +53,9 @@ fun CaptureSheet(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            mode = CaptureMode.Camera
+            onCameraClick()
         } else {
-            // Handle denied - show snackbar or message? 
-            // For now stay in selection
+            // Permission denied logic
         }
     }
 
@@ -69,8 +70,6 @@ fun CaptureSheet(
                 @Suppress("DEPRECATION")
                 MediaStore.Images.Media.getBitmap(context.contentResolver, it)
             }
-            // Resize if too big to avoid OOM or slow AI
-            // For MVP, just pass it
             viewModel.capturedBitmap = bitmap
         }
     }
@@ -101,25 +100,18 @@ fun CaptureSheet(
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         CaptureOption(
-                            icon = R.drawable.ic_app_icon, // Fallback icon, usually camera icon
+                            icon = R.drawable.ic_app_icon, // Fallback
                             label = "Camera",
                             onClick = {
                                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                                    mode = CaptureMode.Camera
+                                    onCameraClick()
                                 } else {
                                     permissionLauncher.launch(Manifest.permission.CAMERA)
                                 }
                             }
                         )
-                        CaptureOption(
-                            icon = R.drawable.ic_app_icon, // Fallback
-                            label = "Gallery",
-                            onClick = {
-                                photoPickerLauncher.launch(
-                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                )
-                            }
-                        )
+                        // Gallery button removed as per request (moved to Camera Screen)
+                        
                         CaptureOption(
                             icon = R.drawable.ic_app_icon, // Fallback
                             label = "Text",
@@ -127,13 +119,6 @@ fun CaptureSheet(
                         )
                     }
                     Spacer(modifier = Modifier.height(48.dp))
-                }
-                mode == CaptureMode.Camera -> {
-                    CameraView(
-                        onImageCaptured = { bmp -> 
-                            viewModel.capturedBitmap = bmp
-                        }
-                    )
                 }
                 mode == CaptureMode.Text -> {
                     TextEntryView(viewModel)
@@ -149,59 +134,6 @@ fun CaptureSheet(
     }
 }
 
-@Composable
-fun CaptureOption(icon: Int, label: String, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Button(
-            onClick = onClick,
-            shape = RoundedCornerShape(16.dp),
-            contentPadding = PaddingValues(24.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = DeepBlue)
-        ) {
-             // Basic text for now as we don't have all icons imported
-             Text(text = label.take(1), style = MaterialTheme.typography.titleLarge)
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(label, style = MaterialTheme.typography.bodyMedium)
-    }
-}
-
-// ... existing CameraView (keep as is or minimal mod) ...
-@Composable
-fun CameraView(onImageCaptured: (Bitmap) -> Unit) {
-    val context = LocalContext.current
-    val imageCapture = remember { ImageCapture.Builder().build() }
-    
-    Box(Modifier.height(400.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp))) {
-        CameraPreview(imageCapture = imageCapture)
-        Button(
-            onClick = {
-                imageCapture.takePicture(
-                    ContextCompat.getMainExecutor(context),
-                    object : ImageCapture.OnImageCapturedCallback() {
-                        override fun onCaptureSuccess(image: ImageProxy) {
-                            val buffer: ByteBuffer = image.planes[0].buffer
-                            val bytes = ByteArray(buffer.remaining())
-                            buffer.get(bytes)
-                            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                            // Rotate if needed? usually Bitmap from byte array might lose EXIF
-                            // For MVP scope, we assume it's okay or Gemini handles it.
-                            onImageCaptured(bitmap)
-                            image.close()
-                        }
-                        override fun onError(exception: ImageCaptureException) {
-                            // Handle error
-                        }
-                    }
-                )
-            },
-            modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = EnergeticOrange)
-        ) {
-            Text("Capture Photo")
-        }
-    }
-}
 
 @Composable
 fun TextEntryView(viewModel: CaptureViewModel) {
@@ -268,6 +200,30 @@ fun ResultView(viewModel: CaptureViewModel, onDismiss: () -> Unit) {
         ) {
             Text("Save Log")
         }
+    }
+}
+
+@Composable
+fun CaptureOption(
+    icon: Int,
+    label: String,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(16.dp)
+    ) {
+        Icon(
+            painter = androidx.compose.ui.res.painterResource(id = icon),
+            contentDescription = label,
+            modifier = Modifier.size(48.dp),
+            tint = DeepBlue
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
     }
 }
 

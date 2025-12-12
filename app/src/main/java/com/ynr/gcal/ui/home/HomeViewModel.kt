@@ -3,14 +3,16 @@ package com.ynr.gcal.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.ynr.gcal.data.local.DailySummary
 import com.ynr.gcal.data.local.MealDao
+import com.ynr.gcal.data.local.MealLog
 import com.ynr.gcal.data.repository.UserRepository
 import com.ynr.gcal.data.repository.UserTargets
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.ZoneId
 
 data class HomeUiState(
     val targets: UserTargets = UserTargets(2000, 150, 200, 60),
@@ -18,45 +20,83 @@ data class HomeUiState(
     val consumedProtein: Int = 0,
     val consumedCarbs: Int = 0,
     val consumedFat: Int = 0,
-    val streak: Int = 0
+    val streak: Int = 0,
+    val waterIntake: Int = 0,
+    val recentLogs: List<MealLog> = emptyList()
 )
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModel(
     private val userRepository: UserRepository,
     private val mealDao: MealDao
 ) : ViewModel() {
 
-    // Combine targets and today's meal logs to calculate progress
-    // Note: We could also use DailySummary table if we update it transactionally.
-    // For simplicity, let's aggregate from MealLogs relative to today's timestamp.
-    
-    // Using simple flow combination
-    val uiState: StateFlow<HomeUiState> = combine(
-        userRepository.userTargets,
-        // In a real app, we'd filter by Day. For simplicity, let's just get all simple sum or 
-        // rely on a specific query. Let's assume getAllMeals() returns everything and we filter in memory
-        // OR better, we use getMealsForDay(today defined in DAO).
-        mealDao.getMealsForDay(System.currentTimeMillis()) 
-    ) { targets, meals ->
-        // Calculate totals
-        val consumedCals = meals.sumOf { it.calories }
-        val consumedProt = meals.sumOf { it.protein }
-        val consumedCarbs = meals.sumOf { it.carbs }
-        val consumedFat = meals.sumOf { it.fat }
-        
-        HomeUiState(
-            targets = targets,
-            consumedCalories = consumedCals,
-            consumedProtein = consumedProt,
-            consumedCarbs = consumedCarbs,
-            consumedFat = consumedFat,
-            streak = 0 // Placeholder, requires DailySummary logic
-        )
+    private val _selectedDate = MutableStateFlow(LocalDate.now())
+    val selectedDate: StateFlow<LocalDate> = _selectedDate.asStateFlow()
+
+    val uiState: StateFlow<HomeUiState> = _selectedDate.flatMapLatest { date ->
+        val startOfDay = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val endOfDay = date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
+        val dateString = date.toString() // YYYY-MM-DD
+
+        combine(
+            userRepository.userTargets,
+            mealDao.getMealsBetween(startOfDay, endOfDay),
+            mealDao.getSummary(dateString)
+        ) { targets, meals, summary ->
+            val consumedCals = meals.sumOf { it.calories }
+            val consumedProt = meals.sumOf { it.protein }
+            val consumedCarbs = meals.sumOf { it.carbs }
+            val consumedFat = meals.sumOf { it.fat }
+            
+            // Recent logs (last 3, sorted by timestamp descending)
+            val recent = meals.sortedByDescending { it.timestamp }.take(3)
+            
+            HomeUiState(
+                targets = targets,
+                consumedCalories = consumedCals,
+                consumedProtein = consumedProt,
+                consumedCarbs = consumedCarbs,
+                consumedFat = consumedFat,
+                streak = summary?.streakCount ?: 0,
+                waterIntake = summary?.waterIntake ?: 0,
+                recentLogs = recent
+            )
+        }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = HomeUiState()
     )
+
+    fun changeDate(daysToAdd: Long) {
+        _selectedDate.value = _selectedDate.value.plusDays(daysToAdd)
+    }
+
+    fun updateWater(amount: Int) {
+        viewModelScope.launch {
+            val date = _selectedDate.value
+            val dateString = date.toString()
+            // We need to fetch current summary first or upsert.
+            // Since we are in VM, let's just do a quick read-modify-write transactional style or assume simple update
+            // Ideally DAO has @Transaction, but for MVP:
+            val currentSummary = mealDao.getSummary(dateString).firstOrNull()
+            
+            val newWater = ((currentSummary?.waterIntake ?: 0) + amount).coerceAtLeast(0)
+            
+            val summary = currentSummary?.copy(waterIntake = newWater) ?: DailySummary(
+                date = dateString,
+                totalCalories = 0,
+                totalProtein = 0,
+                totalCarbs = 0,
+                totalFat = 0,
+                goalCalories = 0,
+                streakCount = 0, // Logic for streak calc is separate, ignoring for now
+                waterIntake = newWater
+            )
+            mealDao.insertOrUpdateSummary(summary)
+        }
+    }
 
     class Factory(
         private val userRepository: UserRepository,

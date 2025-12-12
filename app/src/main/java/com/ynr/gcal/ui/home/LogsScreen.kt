@@ -1,6 +1,7 @@
 package com.ynr.gcal.ui.home
 
 import android.annotation.SuppressLint
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -39,11 +40,23 @@ class LogsViewModel(private val appContainer: AppContainer) : androidx.lifecycle
 }
 
 @SuppressLint("SimpleDateFormat")
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LogsScreen(appContainer: AppContainer) {
     val viewModel: LogsViewModel = viewModel(factory = LogsViewModel.Factory(appContainer))
     val meals by viewModel.meals.collectAsState(initial = emptyList())
-    val dateFormat = remember { SimpleDateFormat("MMM dd, HH:mm") }
+    
+    // Group meals by Date
+    val groupedMeals = remember(meals) {
+        meals.groupBy { 
+            java.time.Instant.ofEpochMilli(it.timestamp)
+                .atZone(java.time.ZoneId.systemDefault())
+                .toLocalDate() 
+        }
+    }
+    
+    val dateFormatter = remember { java.time.format.DateTimeFormatter.ofPattern("EEEE, MMM dd") }
+    val timeFormatter = remember { java.time.format.DateTimeFormatter.ofPattern("h:mm a") }
 
     Column(
         modifier = Modifier
@@ -65,8 +78,23 @@ fun LogsScreen(appContainer: AppContainer) {
             }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(meals) { meal ->
-                    MealCard(meal, dateFormat)
+                groupedMeals.forEach { (date, dailyMeals) ->
+                    stickyHeader {
+                        Text(
+                            text = date.format(dateFormatter),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.DarkGray,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(OffWhite)
+                                .padding(vertical = 8.dp)
+                        )
+                    }
+                    
+                    items(dailyMeals) { meal ->
+                        MealCard(meal, timeFormatter)
+                    }
                 }
             }
         }
@@ -74,7 +102,7 @@ fun LogsScreen(appContainer: AppContainer) {
 }
 
 @Composable
-fun MealCard(meal: MealLog, dateFormat: SimpleDateFormat) {
+fun MealCard(meal: MealLog, timeFormatter: java.time.format.DateTimeFormatter) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -94,12 +122,16 @@ fun MealCard(meal: MealLog, dateFormat: SimpleDateFormat) {
                     .background(DeepBlue.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = meal.foodName.take(1).uppercase(),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = DeepBlue,
-                    fontWeight = FontWeight.Bold
-                )
+                 if (meal.photoUri != null) {
+                     Text("📷")
+                 } else {
+                     Text(
+                        text = meal.foodName.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = DeepBlue,
+                        fontWeight = FontWeight.Bold
+                    )
+                 }
             }
             Spacer(modifier = Modifier.width(16.dp))
             
@@ -109,8 +141,9 @@ fun MealCard(meal: MealLog, dateFormat: SimpleDateFormat) {
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold
                 )
+                val time = java.time.Instant.ofEpochMilli(meal.timestamp).atZone(java.time.ZoneId.systemDefault())
                 Text(
-                    text = dateFormat.format(Date(meal.timestamp)),
+                    text = time.format(timeFormatter),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.Gray
                 )

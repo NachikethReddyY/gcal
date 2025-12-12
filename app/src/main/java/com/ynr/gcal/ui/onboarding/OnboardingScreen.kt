@@ -115,7 +115,10 @@ fun OnboardingBottomBar(
             shape = RoundedCornerShape(24.dp),
             modifier = Modifier.height(48.dp)
         ) {
-            Text(if (isLastStep) "Get My Plan" else "Next")
+            Text(
+                text = if (isLastStep) "Get My Plan" else "Next",
+                color = Color.White
+            )
         }
     }
 }

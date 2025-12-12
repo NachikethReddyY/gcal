@@ -39,7 +39,7 @@ class GeminiRepository {
     }
 
     suspend fun analyzeFoodImage(apiKey: String, bitmap: Bitmap, hint: String): String = withContext(Dispatchers.IO) {
-        val model = getModel(apiKey, "gemini-2.5-flash-image") // Using the requested model name
+        val model = getModel(apiKey, "gemini-1.5-flash")
         
         val inputContent = content {
             image(bitmap)

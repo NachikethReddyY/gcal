@@ -1,5 +1,6 @@
 package com.ynr.gcal.ui.navigation
 
+import android.net.Uri
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -24,12 +25,15 @@ import com.ynr.gcal.ui.theme.DeepBlue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ynr.gcal.ui.capture.CaptureSheet
 import com.ynr.gcal.ui.capture.CaptureViewModel
+import com.ynr.gcal.ui.capture.CameraScreen
+import androidx.compose.ui.platform.LocalContext
 
 sealed class Screen(val route: String, val icon: ImageVector? = null, val label: String? = null) {
     object Onboarding : Screen("onboarding")
     object Home : Screen("home", Icons.Default.Home, "Home")
     object Logs : Screen("logs", Icons.Default.List, "Logs")
     object Settings : Screen("settings", Icons.Default.Settings, "Settings")
+    object Camera : Screen("camera")
 }
 
 @Composable
@@ -45,6 +49,37 @@ fun GCalNavHost(
     val showBottomBar = currentRoute in listOf(Screen.Home.route, Screen.Logs.route, Screen.Settings.route)
     
     var showCaptureSheet by remember { mutableStateOf(false) }
+    
+    // Result Listener for Camera
+    val currentEntry = navController.currentBackStackEntryAsState().value
+    val savedStateHandle = currentEntry?.savedStateHandle
+    
+    val captureViewModel: CaptureViewModel = viewModel(
+        factory = CaptureViewModel.Factory(
+            appContainer.mealDao,
+            appContainer.geminiRepository,
+            appContainer.userRepository
+        )
+    )
+
+    val context = LocalContext.current
+    LaunchedEffect(savedStateHandle) {
+        savedStateHandle?.getLiveData<Uri>("captured_uri")?.observeForever { uri ->
+            if (uri != null) {
+                // Load Bitmap
+                val bitmap = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                     android.graphics.ImageDecoder.decodeBitmap(android.graphics.ImageDecoder.createSource(context.contentResolver, uri))
+                } else {
+                     @Suppress("DEPRECATION")
+                     android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                }
+                
+                captureViewModel.capturedBitmap = bitmap
+                showCaptureSheet = true
+                savedStateHandle.remove<Uri>("captured_uri")
+            }
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -107,19 +142,29 @@ fun GCalNavHost(
             composable(Screen.Home.route) { HomeScreen(appContainer) }
             composable(Screen.Logs.route) { LogsScreen(appContainer) }
             composable(Screen.Settings.route) { SettingsScreen(appContainer) }
+            composable(Screen.Camera.route) {
+                CameraScreen(
+                    onPhotoCaptured = { uri ->
+                        navController.previousBackStackEntry?.savedStateHandle?.set("captured_uri", uri)
+                        navController.popBackStack()
+                    },
+                    onGallerySelected = { uri ->
+                        navController.previousBackStackEntry?.savedStateHandle?.set("captured_uri", uri)
+                        navController.popBackStack()
+                    },
+                    onClose = { navController.popBackStack() }
+                )
+            }
         }
         
         if (showCaptureSheet) {
-            val captureViewModel: CaptureViewModel = viewModel(
-                factory = CaptureViewModel.Factory(
-                    appContainer.mealDao,
-                    appContainer.geminiRepository,
-                    appContainer.userRepository
-                )
-            )
             CaptureSheet(
                 viewModel = captureViewModel,
-                onDismiss = { showCaptureSheet = false }
+                onDismiss = { showCaptureSheet = false },
+                onCameraClick = {
+                    showCaptureSheet = false
+                    navController.navigate(Screen.Camera.route)
+                }
             )
         }
     }

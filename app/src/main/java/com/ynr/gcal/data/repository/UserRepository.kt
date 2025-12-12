@@ -43,6 +43,8 @@ class UserRepository(private val context: Context) {
             fat = prefs[TARGET_FAT] ?: 60
         )
     }
+    
+    val diet: Flow<String> = context.dataStore.data.map { it[DIET] ?: "Balanced" }
 
     suspend fun saveApiKey(key: String) {
         context.dataStore.edit { it[API_KEY] = key }
@@ -70,6 +72,12 @@ class UserRepository(private val context: Context) {
             it[TARGET_CARBS] = carbs
             it[TARGET_FAT] = fat
             it[ONBOARDING_COMPLETED] = true
+        }
+    }
+    
+    suspend fun updateDiet(diet: String) {
+        context.dataStore.edit {
+            it[DIET] = diet
         }
     }
 }
